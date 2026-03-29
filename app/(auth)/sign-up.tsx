@@ -14,11 +14,19 @@ export default function SignUpScreen() {
 
   const onSubmit = async () => {
     setIsSubmitting(true);
-    const { error } = await signUp(email.trim(), password, name.trim());
+    const { error, session } = await signUp(email.trim(), password, name.trim());
     setIsSubmitting(false);
 
     if (error) {
       Alert.alert('Sign up failed', error.message);
+      return;
+    }
+
+    if (!session) {
+      Alert.alert(
+        'Confirm your email',
+        'Check your email to confirm your account. Then sign in to continue.'
+      );
       return;
     }
 

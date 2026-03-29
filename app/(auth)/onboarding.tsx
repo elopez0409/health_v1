@@ -1,3 +1,4 @@
+import type { User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -38,15 +39,24 @@ export default function OnboardingScreen() {
   };
 
   const finishOnboarding = async () => {
-    if (!user) {
-      Alert.alert('Missing session', 'Please sign in again.');
+    let effectiveUser: User | null = user;
+    if (!effectiveUser) {
+      const { data } = await supabase.auth.getSession();
+      effectiveUser = data?.session?.user ?? null;
+    }
+    if (!effectiveUser) {
+      Alert.alert(
+        'Session expired',
+        'Your session may have expired. Please sign in again to complete setup.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/sign-in') }]
+      );
       return;
     }
 
     setIsSaving(true);
 
     const { error: profileError } = await supabase.from('profiles').upsert({
-      id: user.id,
+      id: effectiveUser.id,
       onboarding_completed: true,
       hydration_bottle_oz: bottleSizeOz,
       privacy_settings: {
@@ -62,7 +72,7 @@ export default function OnboardingScreen() {
     }
 
     const goalsPayload = selectedGoals.map((title) => ({
-      user_id: user.id,
+      user_id: effectiveUser!.id,
       title,
       description: `Template goal: ${title}`,
       category: 'performance',
@@ -82,7 +92,7 @@ export default function OnboardingScreen() {
     }
 
     const sourcePayload = connected.map((provider) => ({
-      user_id: user.id,
+      user_id: effectiveUser!.id,
       provider: providerDbMap[provider],
       sync_status: 'synced',
     }));
@@ -97,7 +107,7 @@ export default function OnboardingScreen() {
     }
 
     const { error: prefError } = await supabase.from('dashboard_preferences').upsert({
-      user_id: user.id,
+      user_id: effectiveUser!.id,
       card_order: DEFAULT_DASHBOARD_PREFS.cardOrder,
       pinned_charts: DEFAULT_DASHBOARD_PREFS.pinnedCharts,
       favorite_metrics: DEFAULT_DASHBOARD_PREFS.favoriteMetrics,
@@ -109,7 +119,7 @@ export default function OnboardingScreen() {
       return;
     }
 
-    const { error: seedError } = await seedMockDataForUser(user.id);
+    const { error: seedError } = await seedMockDataForUser(effectiveUser.id);
     if (seedError) {
       setIsSaving(false);
       Alert.alert('Could not seed sample metrics', seedError.message);

@@ -10,7 +10,7 @@ type AuthContextValue = {
   profile: ProfileRow | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null; session: Session | null }>;
   signOut: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 };
@@ -76,17 +76,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
               exportAllowed: true,
             },
           });
+          if (data.session) {
+            setSession(data.session);
+            setProfile(await fetchProfile(data.session.user.id));
+          }
         }
-        return { error: (error as Error | null) ?? null };
+        return {
+          error: (error as Error | null) ?? null,
+          session: data?.session ?? null,
+        };
       },
       signOut: async () => {
         await supabase.auth.signOut();
         setProfile(null);
       },
       completeOnboarding: async () => {
-        if (!session?.user) return;
-        await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', session.user.id);
-        setProfile(await fetchProfile(session.user.id));
+        let currentSession = session;
+        if (!currentSession?.user) {
+          const { data } = await supabase.auth.getSession();
+          currentSession = data?.session ?? null;
+        }
+        if (!currentSession?.user) return;
+        await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', currentSession.user.id);
+        const updated = await fetchProfile(currentSession.user.id);
+        setProfile(updated);
+        if (currentSession !== session) {
+          setSession(currentSession);
+        }
       },
     }),
     [session, profile, isLoading]

@@ -44,3 +44,4 @@ npm run web
 
 - Apply `supabase/migrations/001_initial_schema.sql`
 - Optionally run `supabase/seed.sql` after creating a test user
+- **Development:** Disable "Confirm email" in Supabase Dashboard (Authentication → Providers → Email) so sign-up returns a session immediately and onboarding works without email verification
